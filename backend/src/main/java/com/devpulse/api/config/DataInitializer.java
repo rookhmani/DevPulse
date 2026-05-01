@@ -15,22 +15,25 @@ public class DataInitializer {
     @Bean
     CommandLineRunner seedDefaultUsers(UserRepository users, PasswordEncoder encoder) {
         return args -> {
-            if (users.findByEmail("admin@devpulse.local").isEmpty()) {
-                users.save(User.builder()
-                        .username("admin")
-                        .email("admin@devpulse.local")
-                        .passwordHash(encoder.encode("admin123"))
-                        .role(UserRole.ADMIN)
-                        .build());
-            }
-            if (users.findByEmail("viewer@devpulse.local").isEmpty()) {
-                users.save(User.builder()
-                        .username("viewer")
-                        .email("viewer@devpulse.local")
-                        .passwordHash(encoder.encode("viewer123"))
-                        .role(UserRole.VIEWER)
-                        .build());
-            }
+            User admin = users.findByEmail("admin@devpulse.local")
+                    .orElseGet(() -> User.builder()
+                            .username("admin")
+                            .email("admin@devpulse.local")
+                            .build());
+            admin.setUsername("admin");
+            admin.setPasswordHash(encoder.encode("admin123"));
+            admin.setRole(UserRole.ADMIN);
+            users.save(admin);
+
+            User viewer = users.findByEmail("viewer@devpulse.local")
+                    .orElseGet(() -> User.builder()
+                            .username("viewer")
+                            .email("viewer@devpulse.local")
+                            .build());
+            viewer.setUsername("viewer");
+            viewer.setPasswordHash(encoder.encode("viewer123"));
+            viewer.setRole(UserRole.VIEWER);
+            users.save(viewer);
         };
     }
 }
