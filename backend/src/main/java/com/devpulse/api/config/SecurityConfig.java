@@ -32,7 +32,7 @@ import java.util.List;
 public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    @Value("${app.cors.allowed-origin:http://localhost:3000}")
+    @Value("${app.cors.allowed-origin:${CORS_ALLOWED_ORIGIN:http://localhost:3000}}")
     private String allowedOrigin;
 
     @Bean
