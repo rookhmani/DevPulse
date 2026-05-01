@@ -18,9 +18,9 @@ function ProtectedRoute({ children }) {
     }
 
     const signInDemoUser = async () => {
-      for (let attempt = 1; attempt <= 6; attempt += 1) {
+      for (let attempt = 1; attempt <= 18; attempt += 1) {
         try {
-          setMessage(attempt === 1 ? 'Opening DevPulse...' : 'Starting DevPulse API...');
+          setMessage(attempt === 1 ? 'Opening DevPulse...' : `Starting DevPulse API... (${attempt}/18)`);
           const { data } = await api.post('/auth/login', {
             email: 'admin@devpulse.local',
             password: 'admin123',
@@ -30,7 +30,7 @@ function ProtectedRoute({ children }) {
           setReady(true);
           return;
         } catch {
-          if (attempt === 6) {
+          if (attempt === 18) {
             setError('Unable to connect to the DevPulse API.');
             return;
           }
