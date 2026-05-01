@@ -11,6 +11,7 @@ export default function Releases() {
   const [repositories, setRepositories] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [error, setError] = useState('');
 
   const load = async () => {
     const releaseResponse = await api.get('/releases');
@@ -29,16 +30,26 @@ export default function Releases() {
 
   const openCreateModal = async () => {
     setForm(emptyForm);
-    await loadRepositories();
     setShowModal(true);
+    setError('');
+    try {
+      await loadRepositories();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to load repositories');
+    }
   };
 
   const create = async (event) => {
     event.preventDefault();
-    await api.post('/releases', { ...form, repositoryId: Number(form.repositoryId) });
-    setForm(emptyForm);
-    setShowModal(false);
-    load();
+    setError('');
+    try {
+      await api.post('/releases', { ...form, repositoryId: Number(form.repositoryId) });
+      setForm(emptyForm);
+      setShowModal(false);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to create release');
+    }
   };
 
   return (
@@ -79,6 +90,7 @@ export default function Releases() {
             <label>Environment<select value={form.environment} onChange={(e) => setForm({ ...form, environment: e.target.value })}><option>DEV</option><option>STAGING</option><option>PROD</option></select></label>
             <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>IN_PROGRESS</option><option>DEPLOYED</option><option>ROLLED_BACK</option></select></label>
             <label>Notes<textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
+            {error && <p className="error">{error}</p>}
             <button type="submit">Create release</button>
           </form>
         </Modal>

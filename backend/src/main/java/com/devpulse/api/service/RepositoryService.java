@@ -7,6 +7,7 @@ import com.devpulse.api.entity.CommitSnapshot;
 import com.devpulse.api.entity.Pipeline;
 import com.devpulse.api.entity.Release;
 import com.devpulse.api.entity.RepositoryEntity;
+import com.devpulse.api.enums.PipelineStatus;
 import com.devpulse.api.exception.BadRequestException;
 import com.devpulse.api.exception.ResourceNotFoundException;
 import com.devpulse.api.repository.CommitSnapshotRepository;
@@ -40,7 +41,7 @@ public class RepositoryService {
             throw new BadRequestException("Repository is already tracked");
         }
 
-        GitHubService.GitHubRepositoryData githubData = gitHubService.fetchRepository(normalizedUrl);
+        GitHubService.GitHubRepositoryData githubData = fetchGitHubDataOrFallback(normalizedUrl);
         RepositoryEntity entity = RepositoryEntity.builder()
                 .name(githubData.name())
                 .githubRepoUrl(normalizedUrl)
@@ -53,6 +54,7 @@ public class RepositoryService {
             commit.setRepository(saved);
             commitRepository.save(commit);
         });
+        createInitialPipeline(saved, githubData.commits());
         return toResponse(saved);
     }
 
@@ -66,6 +68,36 @@ public class RepositoryService {
         return commitRepository.findByRepositoryIdOrderByTimestampDesc(repositoryId).stream()
                 .map(commit -> new CommitResponse(commit.getId(), commit.getSha(), commit.getMessage(), commit.getAuthor(), commit.getTimestamp()))
                 .toList();
+    }
+
+    private GitHubService.GitHubRepositoryData fetchGitHubDataOrFallback(String githubRepoUrl) {
+        try {
+            return gitHubService.fetchRepository(githubRepoUrl);
+        } catch (BadRequestException ex) {
+            return new GitHubService.GitHubRepositoryData(
+                    repositoryNameFromUrl(githubRepoUrl),
+                    "Tracked repository",
+                    List.of()
+            );
+        }
+    }
+
+    private void createInitialPipeline(RepositoryEntity repository, List<CommitSnapshot> commits) {
+        CommitSnapshot latestCommit = commits.isEmpty() ? null : commits.get(0);
+        pipelineRepository.save(Pipeline.builder()
+                .repository(repository)
+                .branchName("main")
+                .status(PipelineStatus.PENDING)
+                .triggeredAt(Instant.now())
+                .commitSha(latestCommit == null ? "manual-pending" : latestCommit.getSha())
+                .commitMessage(latestCommit == null ? "Repository tracked. Pipeline pending." : latestCommit.getMessage())
+                .build());
+    }
+
+    private String repositoryNameFromUrl(String githubRepoUrl) {
+        String cleaned = githubRepoUrl.replaceAll("/$", "");
+        String name = cleaned.substring(cleaned.lastIndexOf("/") + 1).replace(".git", "");
+        return name.isBlank() ? "Repository" : name;
     }
 
     private RepositoryResponse toResponse(RepositoryEntity repository) {
