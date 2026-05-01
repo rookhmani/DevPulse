@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+const fallbackApiBaseUrl = import.meta.env.PROD
+  ? 'https://devpulse-backend-kb66.onrender.com/api'
+  : 'http://localhost:8080/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || fallbackApiBaseUrl,
 });
 
 api.interceptors.request.use((config) => {

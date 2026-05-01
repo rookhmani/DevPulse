@@ -10,6 +10,7 @@ import Repositories from './pages/Repositories.jsx';
 function ProtectedRoute({ children }) {
   const [ready, setReady] = useState(Boolean(localStorage.getItem('devpulse_token')));
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('Opening DevPulse...');
 
   useEffect(() => {
     if (ready) {
@@ -17,16 +18,24 @@ function ProtectedRoute({ children }) {
     }
 
     const signInDemoUser = async () => {
-      try {
-        const { data } = await api.post('/auth/login', {
-          email: 'admin@devpulse.local',
-          password: 'admin123',
-        });
-        localStorage.setItem('devpulse_token', data.token);
-        localStorage.setItem('devpulse_user', JSON.stringify(data));
-        setReady(true);
-      } catch {
-        setError('Unable to connect to the DevPulse API.');
+      for (let attempt = 1; attempt <= 6; attempt += 1) {
+        try {
+          setMessage(attempt === 1 ? 'Opening DevPulse...' : 'Starting DevPulse API...');
+          const { data } = await api.post('/auth/login', {
+            email: 'admin@devpulse.local',
+            password: 'admin123',
+          });
+          localStorage.setItem('devpulse_token', data.token);
+          localStorage.setItem('devpulse_user', JSON.stringify(data));
+          setReady(true);
+          return;
+        } catch {
+          if (attempt === 6) {
+            setError('Unable to connect to the DevPulse API.');
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 10000));
+        }
       }
     };
 
@@ -37,7 +46,7 @@ function ProtectedRoute({ children }) {
     return <main className="login-page"><section className="login-panel"><strong>{error}</strong></section></main>;
   }
 
-  return ready ? children : <main className="login-page"><section className="login-panel"><strong>Opening DevPulse...</strong></section></main>;
+  return ready ? children : <main className="login-page"><section className="login-panel"><strong>{message}</strong></section></main>;
 }
 
 export default function App() {
