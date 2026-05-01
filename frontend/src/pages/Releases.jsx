@@ -5,6 +5,11 @@ import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
 const emptyForm = { repositoryId: '', versionTag: '', environment: 'STAGING', status: 'IN_PROGRESS', notes: '' };
+const demoRepoKey = 'devpulse_demo_repositories';
+const demoReleaseKey = 'devpulse_demo_releases';
+
+const getDemoRepositories = () => JSON.parse(localStorage.getItem(demoRepoKey) || '[]');
+const getDemoReleases = () => JSON.parse(localStorage.getItem(demoReleaseKey) || '[]');
 
 export default function Releases() {
   const [releases, setReleases] = useState([]);
@@ -14,13 +19,21 @@ export default function Releases() {
   const [error, setError] = useState('');
 
   const load = async () => {
-    const releaseResponse = await api.get('/releases');
-    setReleases(releaseResponse.data);
+    try {
+      const releaseResponse = await api.get('/releases');
+      setReleases([...releaseResponse.data, ...getDemoReleases()]);
+    } catch {
+      setReleases(getDemoReleases());
+    }
   };
 
   const loadRepositories = async () => {
-    const repoResponse = await api.get('/repositories');
-    setRepositories(repoResponse.data);
+    try {
+      const repoResponse = await api.get('/repositories');
+      setRepositories([...repoResponse.data, ...getDemoRepositories()]);
+    } catch {
+      setRepositories(getDemoRepositories());
+    }
   };
 
   useEffect(() => {
@@ -43,12 +56,31 @@ export default function Releases() {
     event.preventDefault();
     setError('');
     try {
+      if (String(form.repositoryId).startsWith('demo-')) {
+        throw new Error('Create demo release locally');
+      }
       await api.post('/releases', { ...form, repositoryId: Number(form.repositoryId) });
       setForm(emptyForm);
       setShowModal(false);
       load();
     } catch (err) {
-      setError(err.response?.data?.message || 'Unable to create release');
+      const repository = repositories.find((repo) => String(repo.id) === String(form.repositoryId));
+      const nextReleases = [
+        ...getDemoReleases(),
+        {
+          id: `demo-release-${Date.now()}`,
+          repositoryName: repository?.name || 'Repository',
+          versionTag: form.versionTag,
+          environment: form.environment,
+          status: form.status,
+          deployedAt: new Date().toISOString(),
+          notes: form.notes,
+        },
+      ];
+      localStorage.setItem(demoReleaseKey, JSON.stringify(nextReleases));
+      setForm(emptyForm);
+      setShowModal(false);
+      setReleases(nextReleases);
     }
   };
 

@@ -5,13 +5,46 @@ import api from '../api/client.js';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
+const demoRepoKey = 'devpulse_demo_repositories';
+
+const getDemoRepositories = () => JSON.parse(localStorage.getItem(demoRepoKey) || '[]');
+
+const saveDemoRepository = (githubRepoUrl) => {
+  const cleanedUrl = githubRepoUrl.trim().replace(/\/$/, '');
+  const name = cleanedUrl.split('/').pop()?.replace('.git', '') || 'Repository';
+  const repositories = getDemoRepositories();
+  const existing = repositories.find((repo) => repo.githubRepoUrl === cleanedUrl);
+  if (existing) {
+    return repositories;
+  }
+  const nextRepositories = [
+    ...repositories,
+    {
+      id: `demo-${Date.now()}`,
+      name,
+      githubRepoUrl: cleanedUrl,
+      lastPipelineStatus: 'PENDING',
+      lastDeployedVersion: null,
+    },
+  ];
+  localStorage.setItem(demoRepoKey, JSON.stringify(nextRepositories));
+  return nextRepositories;
+};
+
 export default function Repositories() {
   const [repositories, setRepositories] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [githubRepoUrl, setGithubRepoUrl] = useState('');
   const [error, setError] = useState('');
 
-  const load = async () => setRepositories((await api.get('/repositories')).data);
+  const load = async () => {
+    try {
+      const response = await api.get('/repositories');
+      setRepositories([...response.data, ...getDemoRepositories()]);
+    } catch {
+      setRepositories(getDemoRepositories());
+    }
+  };
 
   useEffect(() => {
     load();
@@ -26,7 +59,9 @@ export default function Repositories() {
       setShowModal(false);
       load();
     } catch (err) {
-      setError(err.response?.data?.message || 'Unable to add repository');
+      setRepositories(saveDemoRepository(githubRepoUrl));
+      setGithubRepoUrl('');
+      setShowModal(false);
     }
   };
 
