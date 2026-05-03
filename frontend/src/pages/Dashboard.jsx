@@ -4,17 +4,37 @@ import api from '../api/client.js';
 import MetricCard from '../components/MetricCard.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
+const getDemoRepositories = () => JSON.parse(localStorage.getItem('devpulse_demo_repositories') || '[]');
+
 export default function Dashboard() {
   const [metrics, setMetrics] = useState(null);
   const [repositories, setRepositories] = useState([]);
 
   const load = async () => {
-    const [metricResponse, repoResponse] = await Promise.all([
-      api.get('/dashboard/metrics'),
-      api.get('/repositories'),
-    ]);
-    setMetrics(metricResponse.data);
-    setRepositories(repoResponse.data);
+    try {
+      const [metricResponse, repoResponse] = await Promise.all([
+        api.get('/dashboard/metrics'),
+        api.get('/repositories'),
+      ]);
+      const demoRepositories = getDemoRepositories();
+      setMetrics({
+        ...metricResponse.data,
+        totalRepositories: metricResponse.data.totalRepositories + demoRepositories.length,
+      });
+      setRepositories([...repoResponse.data, ...demoRepositories]);
+    } catch {
+      const demoRepositories = getDemoRepositories();
+      setMetrics({
+        totalRepositories: demoRepositories.length,
+        totalPipelines: demoRepositories.length,
+        successRate: demoRepositories.length
+          ? Math.round((demoRepositories.filter((repo) => repo.lastPipelineStatus === 'SUCCESS').length / demoRepositories.length) * 100)
+          : 0,
+        deploymentsThisWeek: 0,
+        deploymentsPerDay: [],
+      });
+      setRepositories(demoRepositories);
+    }
   };
 
   useEffect(() => {

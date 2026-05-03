@@ -3,6 +3,17 @@ import { useParams } from 'react-router-dom';
 import api from '../api/client.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 
+const demoRepoKey = 'devpulse_demo_repositories';
+
+const getDemoRepositories = () => JSON.parse(localStorage.getItem(demoRepoKey) || '[]');
+
+const setDemoRepositoryStatus = (repoId, status) => {
+  const repositories = getDemoRepositories().map((repo) => (
+    String(repo.id) === String(repoId) ? { ...repo, lastPipelineStatus: status } : repo
+  ));
+  localStorage.setItem(demoRepoKey, JSON.stringify(repositories));
+};
+
 export default function PipelineDetail() {
   const { repoId } = useParams();
   const [pipelines, setPipelines] = useState([]);
@@ -11,6 +22,20 @@ export default function PipelineDetail() {
   const [error, setError] = useState('');
 
   const load = async () => {
+    if (String(repoId).startsWith('demo-')) {
+      const repository = getDemoRepositories().find((repo) => String(repo.id) === String(repoId));
+      setPipelines(repository ? [{
+        id: `${repoId}-pipeline`,
+        branchName: 'main',
+        status: repository.lastPipelineStatus || 'PENDING',
+        triggeredAt: new Date().toISOString(),
+        commitSha: 'manual-run',
+        commitMessage: 'Demo pipeline status update',
+      }] : []);
+      setCommits([]);
+      return;
+    }
+
     const [pipelineResponse, commitResponse] = await Promise.all([
       api.get(`/repositories/${repoId}/pipelines`),
       api.get(`/repositories/${repoId}/commits`),
@@ -23,6 +48,12 @@ export default function PipelineDetail() {
     setError('');
     setSavingStatus(status);
     try {
+      if (String(repoId).startsWith('demo-')) {
+        setDemoRepositoryStatus(repoId, status);
+        await load();
+        return;
+      }
+
       const latestPipeline = pipelines[0];
 
       if (latestPipeline) {

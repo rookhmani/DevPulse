@@ -84,6 +84,15 @@ a { color: #126f62; font-weight: 700; text-decoration: none; }
   justify-content: flex-end;
 }
 .status-actions button { min-height: 34px; }
+.table-actions {
+  justify-content: flex-start;
+  min-width: 250px;
+}
+.table-actions button {
+  font-size: 12px;
+  min-height: 30px;
+  padding: 0 10px;
+}
 .success-action { background: #15803d; }
 .success-action:hover { background: #166534; }
 .running-action { background: #b77905; }

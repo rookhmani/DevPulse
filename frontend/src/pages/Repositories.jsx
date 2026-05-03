@@ -9,6 +9,14 @@ const demoRepoKey = 'devpulse_demo_repositories';
 
 const getDemoRepositories = () => JSON.parse(localStorage.getItem(demoRepoKey) || '[]');
 
+const setDemoRepositoryStatus = (repoId, status) => {
+  const repositories = getDemoRepositories().map((repo) => (
+    String(repo.id) === String(repoId) ? { ...repo, lastPipelineStatus: status } : repo
+  ));
+  localStorage.setItem(demoRepoKey, JSON.stringify(repositories));
+  return repositories;
+};
+
 const saveDemoRepository = (githubRepoUrl) => {
   const cleanedUrl = githubRepoUrl.trim().replace(/\/$/, '');
   const name = cleanedUrl.split('/').pop()?.replace('.git', '') || 'Repository';
@@ -65,6 +73,38 @@ export default function Repositories() {
     }
   };
 
+  const updatePipelineStatus = async (repo, status) => {
+    if (String(repo.id).startsWith('demo-')) {
+      const demoRepositories = setDemoRepositoryStatus(repo.id, status);
+      setRepositories((current) => [
+        ...current.filter((item) => !String(item.id).startsWith('demo-')),
+        ...demoRepositories,
+      ]);
+      return;
+    }
+
+    try {
+      const pipelineResponse = await api.get(`/repositories/${repo.id}/pipelines`);
+      const latestPipeline = pipelineResponse.data[0];
+      if (latestPipeline) {
+        await api.patch(`/pipelines/${latestPipeline.id}/status`, { status });
+      } else {
+        await api.post('/pipelines', {
+          repositoryId: Number(repo.id),
+          branchName: 'main',
+          status,
+          commitSha: 'manual-run',
+          commitMessage: 'Manual pipeline status update',
+        });
+      }
+      await load();
+    } catch {
+      setRepositories((current) => current.map((item) => (
+        item.id === repo.id ? { ...item, lastPipelineStatus: status } : item
+      )));
+    }
+  };
+
   return (
     <section>
       <div className="page-title">
@@ -74,13 +114,20 @@ export default function Repositories() {
 
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>GitHub URL</th><th>Last Pipeline</th><th>Last Version</th></tr></thead>
+          <thead><tr><th>Name</th><th>GitHub URL</th><th>Last Pipeline</th><th>Actions</th><th>Last Version</th></tr></thead>
           <tbody>
             {repositories.map((repo) => (
               <tr key={repo.id}>
                 <td><Link to={`/pipelines/${repo.id}`}>{repo.name}</Link></td>
                 <td>{repo.githubRepoUrl}</td>
                 <td><StatusBadge status={repo.lastPipelineStatus} /></td>
+                <td>
+                  <div className="status-actions table-actions">
+                    <button className="success-action" onClick={() => updatePipelineStatus(repo, 'SUCCESS')}>Success</button>
+                    <button className="running-action" onClick={() => updatePipelineStatus(repo, 'RUNNING')}>Running</button>
+                    <button className="failed-action" onClick={() => updatePipelineStatus(repo, 'FAILED')}>Failed</button>
+                  </div>
+                </td>
                 <td>{repo.lastDeployedVersion || 'n/a'}</td>
               </tr>
             ))}
